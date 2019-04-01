@@ -21,14 +21,20 @@ uint32_t kernel_main(void) {
 	load_idt();
 	print("Done loading IDT.\n");
 
-	print("Initializing paging...\n");
-	init_paging();
-	print("Done initializing paging.\n");
+	// test "general protection fault" exception handler (in kernel mode)
+	//   (selector in interrupt/exception handler would need to be 0x0008, not 0x0018)
+	//asm("int 0x10");
+
+
+	//print("Initializing paging...\n");
+	//init_paging();
+	//print("Done initializing paging.\n");
 
 	// uncomment to make sure we are running in ring 0 (i.e. halt allowed)
 	//asm("HLT");	
 
-	/* uncomment to go into user mode (i.e. the function user_mode())
+	// uncomment to go into user mode (i.e. the function user_mode())
+	/*
 	asm("MOV AX, 0x23\n"	
 		"MOV DS, AX\n"
 		"MOV ES, AX\n"
@@ -42,7 +48,7 @@ uint32_t kernel_main(void) {
 		"PUSH EAX\n"
 		"IRETD");
 	*/
-
+	
 	return 0xDEADBEEF;
 }
 
@@ -102,7 +108,6 @@ void init_paging()
 */
 	print("Set up page directory kernel entries.\n");
 
-	while(1);
 	enable_paging();
 }
 
@@ -287,13 +292,42 @@ void print_uint32_hex(uint32_t input)
 }
 
 
-void isr_0x60()
+void isr_0x00()
 {
 	// Probably needs to be moved to an .asm file, because compiler
 	//     does not handle the stack in the way we require
 	//     (and that .asm file will need to be linked properly)
-	print("This is the system call interrupt.\n");
+	print("\nYou divided by zero! This is undefined in any (algebraic) ring.\nThe processor has been halted.");
+
+	asm("hlt");
 }
+
+void isr_0x0A()
+{
+	print("\nInvalid TSS (task state segment)!\nThe processor has been halted.");
+	
+	// if this exception happened in user mode, then halting would generate a GPF,
+	//   which would cause an infinite exception loop, so just loop instead, for now.
+    // Maybe use a condition that checks CPL?
+	while(1)
+	{
+		// loop infinitely (sort of like halting)
+	}
+}
+
+void isr_0x0D()
+{
+	print("\nGeneral protection fault!\nThe processor has been halted.");
+
+	// if this exception happened in user mode, then halting would generate another GPF,
+	//   which would cause an infinite exception loop, so just loop instead, for now.
+    // Maybe use a condition that checks CPL?
+	while(1)
+	{
+		// loop infinitely (sort of like halting)
+	}
+}
+
 
 typedef struct {
 	uint16_t offset_low;  // bits 0 through 15 of ISR address
@@ -301,7 +335,7 @@ typedef struct {
 	uint8_t zero;       // unused, must be set to 0
 	uint8_t type_attr;  // type and attributes of this IDT entry
 	uint16_t offset_high;  // bits 16 through 31 of ISR address
-} __attribute__((packed)) idt_entry_t;
+} idt_entry_t;
 
 // the actual IDT
 idt_entry_t idt[256];
@@ -319,12 +353,29 @@ void load_idt()
 	idtr_contents.limit = (256 * sizeof(idt_entry_t)) - 1;
 	idtr_contents.base = (uint32_t)idt;
 
-	idt[0x60].offset_low = ((uint32_t)isr_0x60) & 0x0000FFFF;
-	idt[0x60].offset_high = ((uint32_t)isr_0x60 >> 16) & 0x0000FFFF;
-	idt[0x60].selector = 0x0008;
-	idt[0x60].zero = 0x00;
+	idt[0x00].offset_low = ((uint32_t)isr_0x00) & 0x0000FFFF;
+	idt[0x00].offset_high = ((uint32_t)isr_0x00 >> 16) & 0x0000FFFF;
+	idt[0x00].selector = 0x0008;
+	idt[0x00].zero = 0x00;
 	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
-	idt[0x60].type_attr = 0xEE;
+	idt[0x00].type_attr = 0xEE;
+
+	idt[0x0A].offset_low = ((uint32_t)isr_0x0A) & 0x0000FFFF;
+	idt[0x0A].offset_high = ((uint32_t)isr_0x0A >> 16) & 0x0000FFFF;
+	idt[0x0A].selector = 0x0018;
+	idt[0x0A].zero = 0x00;
+	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
+	idt[0x0A].type_attr = 0xEE;
+
+	idt[0x0D].offset_low = ((uint32_t)isr_0x0D) & 0x0000FFFF;
+	idt[0x0D].offset_high = ((uint32_t)isr_0x0D >> 16) & 0x0000FFFF;
+	// 0x0018 selector for user mode...seems useful for debugging.
+	// Should be 0x0008 so that we let kernel mode handle the exceptions? need to be able to switch between
+	//   user and kernel mode first...	
+	idt[0x0D].selector = 0x0018;
+	idt[0x0D].zero = 0x00;
+	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
+	idt[0x0D].type_attr = 0xEE;
 
 	asm volatile("lidt [idtr_contents]");
 }
@@ -338,8 +389,8 @@ void user_mode()
 	
 	print("Now we're in user mode.\n");
 
-	// uncomment to make sure we are running in ring 0 (i.e. halt NOT allowed)
-	//asm("HLT");	
+	// uncomment to make sure we are running in ring 3 (i.e. halt NOT allowed)
+	//asm("hlt");
 
 	while(1);
 }
