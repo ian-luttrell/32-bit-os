@@ -1,0 +1,13 @@
+	; get entry point from ELF header
+	MOV EAX, DWORD [0x8218]
+	; shift off the highest nibble of the entry point. The lower 12 bits tell us the offset of
+	;     the .text section in the 4th sector of the floppy 
+	SHL EAX, 20
+	SHR EAX, 20
+	; store result in EBX	
+	MOV EBX, EAX
+
+	; divide EAX by 0x200 to the number of sectors (past 0x8200) where entry point resides
+	;     (will probably be 2 sectors past, i.e. the 6th sector of floppy)
+	; then add 0x8000 to EBX to determine the memory location where we need to load the image
+	;     (i.e. the entry point of image, as specified by linker script link.ld)
