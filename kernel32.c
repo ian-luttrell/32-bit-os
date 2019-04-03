@@ -34,7 +34,7 @@ uint32_t kernel_main(void) {
 	//asm("HLT");	
 
 	// uncomment to go into user mode (i.e. the function user_mode())
-	/*
+	
 	asm("MOV AX, 0x23\n"	
 		"MOV DS, AX\n"
 		"MOV ES, AX\n"
@@ -43,12 +43,13 @@ uint32_t kernel_main(void) {
 		"PUSH 0x23\n"		
 		"PUSH ESP\n"		
 		"PUSHFD\n"			
-		"PUSH 0x1B\n"		
+		"PUSH 0x1B\n"	
 		"LEA EAX, [user_mode]\n"	
 		"PUSH EAX\n"
 		"IRETD");
-	*/
 	
+	//int error = 5 / 0;	
+
 	return 0xDEADBEEF;
 }
 
@@ -328,6 +329,16 @@ void isr_0x0D()
 	}
 }
 
+void isr_0x80()
+{
+	print("\nSystem call!");
+
+	while(1)
+	{
+		// loop infinitely
+	}
+}
+
 
 typedef struct {
 	uint16_t offset_low;  // bits 0 through 15 of ISR address
@@ -355,9 +366,10 @@ void load_idt()
 
 	idt[0x00].offset_low = ((uint32_t)isr_0x00) & 0x0000FFFF;
 	idt[0x00].offset_high = ((uint32_t)isr_0x00 >> 16) & 0x0000FFFF;
-	idt[0x00].selector = 0x0008;
+	idt[0x00].selector = 0x0018;
 	idt[0x00].zero = 0x00;
 	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
+	// 11101110
 	idt[0x00].type_attr = 0xEE;
 
 	idt[0x0A].offset_low = ((uint32_t)isr_0x0A) & 0x0000FFFF;
@@ -377,6 +389,13 @@ void load_idt()
 	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
 	idt[0x0D].type_attr = 0xEE;
 
+	idt[0x80].offset_low = ((uint32_t)isr_0x80) & 0x0000FFFF;
+	idt[0x80].offset_high = ((uint32_t)isr_0x80 >> 16) & 0x0000FFFF;	
+	idt[0x80].selector = 0x0018;
+	idt[0x80].zero = 0x00;
+	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
+	idt[0x80].type_attr = 0xEE;
+
 	asm volatile("lidt [idtr_contents]");
 }
 
@@ -391,6 +410,10 @@ void user_mode()
 
 	// uncomment to make sure we are running in ring 3 (i.e. halt NOT allowed)
 	//asm("hlt");
+
+	//int error = 5 / 0;
+
+	asm("int 0x80");
 
 	while(1);
 }

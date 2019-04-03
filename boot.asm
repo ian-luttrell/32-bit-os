@@ -131,34 +131,34 @@ gdt_start:
 ; kernel code:			; code descriptor (offset 0x08)
 	DW 0xFFFF 			; limit low (in paragraphs)
 	DW 0x0000 			; base low
-	DB 0x00 			; base middle
+	DB 00000000B 		; base middle
 	DB 10011010B 		; access
 	DB 11001111B 		; granularity
-	DB 0x00 			; base high
+	DB 00000000B 		; base high
  
 ; kernel data:			; data descriptor (offset 0x10)
 	DW 0xFFFF 			; limit low (in paragraphs)
 	DW 0x0000 			; base low
-	DB 0x00 			; base middle
+	DB 00000000B 		; base middle
 	DB 10010010B 		; access
 	DB 11001111B 		; granularity
-	DB 0x00				; base high
+	DB 00000000B		; base high
  
 ; user code:			; code descriptor (offset 0x18)
     DW 0xFFFF 			; limit low (in paragraphs)
 	DW 0x0000 			; base low
-	DB 0x00 			; base middle
+	DB 00000000B 		; base middle
 	DB 11111010B 		; access
 	DB 11001111B 		; granularity
-	DB 0x00 			; base high
+	DB 00000000B		; base high
 
 ; user data:			; data descriptor (offset 0x20)
 	DW 0xFFFF 			; limit low (in paragraphs)
 	DW 0x0000 			; base low
-	DB 0x00 			; base middle
+	DB 00000000B 		; base middle
 	DB 11110010B 		; access
 	DB 11001111B 		; granularity
-	DB 0x00 			; base high
+	DB 00000000B 		; base high
 
  
 end_of_gdt:
