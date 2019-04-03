@@ -160,6 +160,9 @@ gdt_start:
 	DB 11001111B 		; granularity
 	DB 00000000B 		; base high
 
+; task state segment for going to ring 0 from ring 3
+;   (put another segment descriptor here)
+	
  
 end_of_gdt:
 gdtr: 
@@ -175,6 +178,46 @@ installGDT:
 	RET
 ; END installGDT 
 
+
+tss:
+	DW 0x0000           ; link
+	DW 0x0000           ; reserved
+	DD 0xFFFF0000       ; ESP0
+	DW 0x0010           ; SS0
+	DW 0x0000           ; reserved
+	DD 0x00000000       ; ESP1
+	DW 0x0000           ; SS1
+	DW 0x0000           ; reserved
+	DD 0x00000000       ; ESP2
+	DW 0x0000           ; SS2
+	DW 0x0000           ; reserved
+	DD 0x00000000       ; CR3
+	DD 0x00000000       ; EIP
+	DD 0x00000000       ; EFLAGS
+	DD 0x00000000       ; EAX
+	DD 0x00000000       ; ECX
+	DD 0x00000000       ; EDX
+	DD 0x00000000       ; EBX
+	DD 0x00000000       ; ESP
+	DD 0x00000000       ; EBP
+	DD 0x00000000       ; ESI
+	DD 0x00000000       ; EDI
+	DW 0x0000           ; ES
+	DW 0x0000           ; reserved
+	DW 0x0000           ; CS
+	DW 0x0000           ; reserved
+	DW 0x0000           ; SS
+	DW 0x0000           ; reserved
+	DW 0x0000           ; DS
+	DW 0x0000           ; reserved
+	DW 0x0000           ; FS
+	DW 0x0000           ; reserved
+	DW 0x0000           ; GS
+	DW 0x0000           ; reserved
+	DW 0x0000           ; LDTR
+	DW 0x0000           ; reserved
+	DW 0x0000           ; reserved
+	DW 0x0000           ; IOPB offset
 
 
 BITS 32

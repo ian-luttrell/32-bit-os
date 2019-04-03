@@ -300,7 +300,8 @@ void isr_0x00()
 	//     (and that .asm file will need to be linked properly)
 	print("\nYou divided by zero! This is undefined in any (algebraic) ring.\nThe processor has been halted.");
 
-	asm("hlt");
+	while(1);
+	//asm("hlt");
 }
 
 void isr_0x0A()
@@ -411,7 +412,7 @@ void user_mode()
 	// uncomment to make sure we are running in ring 3 (i.e. halt NOT allowed)
 	//asm("hlt");
 
-	//int error = 5 / 0;
+	int error = 5 / 0;
 
 	asm("int 0x80");
 
