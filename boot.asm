@@ -88,6 +88,7 @@ bootloader_stage_2:
 	;     (we should actually read the ELF header to get the
 	;     entry point and use that to determine the floppy sector and
 	;	  memory location to use ... see elf_read.txt for code)
+
 	PUSHA
 	MOV AH, 0x02	   
 	MOV AL, 50			; reserve kernel space		   
@@ -100,7 +101,7 @@ bootloader_stage_2:
 	MOV BX, 0x8400	   
 	INT 0x13
 	POPA
-
+	
 	; install the global descriptor table (flat segmentation)
 	CALL installGDT
 
@@ -110,6 +111,9 @@ bootloader_stage_2:
 	OR EAX, 1
 	MOV CR0, EAX
 	STI
+
+	; install Task State Segment for software interrupts
+	CALL installTSS
 
 	CLI
 	MOV		AX, 0x10	; set data segments to kernel data selector (0x10)	
@@ -160,8 +164,14 @@ gdt_start:
 	DB 11001111B 		; granularity
 	DB 00000000B 		; base high
 
-; task state segment for going to ring 0 from ring 3
-;   (put another segment descriptor here)
+; task state segment for going to ring 0 from ring 3 (offset 0x28)
+	DW 0x0000			; limit low (in paragraphs)
+	DW 0x7E8C 			; base low
+	DB 00000000B 		; base middle
+	; access bit 4 must be cleared for TSS descriptor (and other system descriptors)	
+	DB 10001001B 		; access
+	DB 01001111B 		; granularity
+	DB 00000000B 		; base high
 	
  
 end_of_gdt:
@@ -176,13 +186,22 @@ installGDT:
 	STI
 	POPA
 	RET
-; END installGDT 
+
+
+installTSS:
+	CLI
+	PUSHA
+	MOV AX, 0x28        ; 0x28, not 0x2B, because RPL = 0
+	LTR AX
+	STI
+	POPA
+	RET	 
 
 
 tss:
 	DW 0x0000           ; link
 	DW 0x0000           ; reserved
-	DD 0xFFFF0000       ; ESP0
+	DD 0x000F0000       ; ESP0
 	DW 0x0010           ; SS0
 	DW 0x0000           ; reserved
 	DD 0x00000000       ; ESP1
@@ -225,8 +244,7 @@ BITS 32
 kernel_mode:
 	
 	; call into entry point of kernel (i.e. the function kernel_main())
-	CALL 0x8400	
-	JMP $
+	CALL 0x8400
 
 times 1024-($-$$) DB 0		; Pad rest of sector
 

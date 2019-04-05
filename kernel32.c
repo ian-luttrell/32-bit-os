@@ -332,12 +332,9 @@ void isr_0x0D()
 
 void isr_0x80()
 {
-	print("\nSystem call!");
+	print("\nSystem call! Halting the processor.");
 
-	while(1)
-	{
-		// loop infinitely
-	}
+	asm("hlt");
 }
 
 
@@ -392,7 +389,7 @@ void load_idt()
 
 	idt[0x80].offset_low = ((uint32_t)isr_0x80) & 0x0000FFFF;
 	idt[0x80].offset_high = ((uint32_t)isr_0x80 >> 16) & 0x0000FFFF;	
-	idt[0x80].selector = 0x0018;
+	idt[0x80].selector = 0x0008;
 	idt[0x80].zero = 0x00;
 	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
 	idt[0x80].type_attr = 0xEE;
@@ -412,9 +409,9 @@ void user_mode()
 	// uncomment to make sure we are running in ring 3 (i.e. halt NOT allowed)
 	//asm("hlt");
 
-	int error = 5 / 0;
-
 	asm("int 0x80");
+
+	print("\nNow we're back in user mode.");
 
 	while(1);
 }
