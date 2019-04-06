@@ -295,14 +295,14 @@ void print_uint32_hex(uint32_t input)
 
 __attribute__((interrupt)) void isr_0x00(uint32_t *p)
 {
-	print("\nYou divided by zero! This is undefined in any (algebraic) ring.\nThe processor has been halted.");
+	print("\n\nYou divided by zero! This is undefined in any (algebraic) ring.\nThe processor has been halted.");
 
 	asm("hlt");
 }
 
 __attribute__((interrupt)) void isr_0x0A(uint32_t *p)
 {
-	print("\nInvalid TSS (task state segment)!\nThe processor has been halted.");
+	print("\n\nInvalid TSS (task state segment)!\nThe processor has been halted.");
 	
 	asm("hlt");
 }
@@ -310,20 +310,23 @@ __attribute__((interrupt)) void isr_0x0A(uint32_t *p)
 
 __attribute__((interrupt)) void isr_0x0D(uint32_t *p)
 {
-	print("\nGeneral protection fault!\nThe processor has been halted.");
+	print("\n\nGeneral protection fault!\nThe processor has been halted.");
 
+	asm("mov eax, 0x0badc0de");
+	
 	asm("hlt");
 }
 
 
-uint32_t cpl;
 __attribute__((interrupt)) void isr_0x80(uint32_t *ptr)
 {
+	print("\n\nSystem call! The CS register currently contains: ");
+	uint32_t cs_contents;
 	asm("mov ebx, cs");
-	asm("mov cpl, ebx");
-	print_uint32_hex(cpl);
+	asm("mov %0, ebx" : "=r"(cs_contents));
+	print_uint32_hex(cs_contents);
 
-	print("\nSystem call! Returning to user mode.");
+	print("\nReturning to user mode.");
 }
 
 
@@ -390,17 +393,19 @@ void user_mode()
 {
 	asm("ADD ESP, 4");
 	
-	print("Now we're in user mode.\n");
+	print("\nNow we're in user mode.");
 
 	asm("int 0x80");
 
-	print("\nNow we're back in user mode.\n");
-
+	print("\n\nNow we're back in user mode.\n");
+	print("The CS register currently contains: ");
+	uint32_t cs_contents;
 	asm("mov ebx, cs");
-	asm("mov cpl, ebx");
-	print_uint32_hex(cpl);
+	asm("mov %0, ebx" : "=r"(cs_contents));
+	print_uint32_hex(cs_contents);
 
-	while(1);
+	// commit a general protection fault, so our handler will halt the processor
+	asm("lidt [0xbeef]");
 }
 
 
