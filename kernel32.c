@@ -293,48 +293,37 @@ void print_uint32_hex(uint32_t input)
 }
 
 
-void isr_0x00()
+__attribute__((interrupt)) void isr_0x00(uint32_t *p)
 {
-	// Probably needs to be moved to an .asm file, because compiler
-	//     does not handle the stack in the way we require
-	//     (and that .asm file will need to be linked properly)
 	print("\nYou divided by zero! This is undefined in any (algebraic) ring.\nThe processor has been halted.");
 
-	while(1);
-	//asm("hlt");
+	asm("hlt");
 }
 
-void isr_0x0A()
+__attribute__((interrupt)) void isr_0x0A(uint32_t *p)
 {
 	print("\nInvalid TSS (task state segment)!\nThe processor has been halted.");
 	
-	// if this exception happened in user mode, then halting would generate a GPF,
-	//   which would cause an infinite exception loop, so just loop instead, for now.
-    // Maybe use a condition that checks CPL?
-	while(1)
-	{
-		// loop infinitely (sort of like halting)
-	}
+	asm("hlt");
 }
 
-void isr_0x0D()
+
+__attribute__((interrupt)) void isr_0x0D(uint32_t *p)
 {
 	print("\nGeneral protection fault!\nThe processor has been halted.");
 
-	// if this exception happened in user mode, then halting would generate another GPF,
-	//   which would cause an infinite exception loop, so just loop instead, for now.
-    // Maybe use a condition that checks CPL?
-	while(1)
-	{
-		// loop infinitely (sort of like halting)
-	}
+	asm("hlt");
 }
 
-void isr_0x80()
-{
-	print("\nSystem call! Halting the processor.");
 
-	asm("hlt");
+uint32_t cpl;
+__attribute__((interrupt)) void isr_0x80(uint32_t *ptr)
+{
+	asm("mov ebx, cs");
+	asm("mov cpl, ebx");
+	print_uint32_hex(cpl);
+
+	print("\nSystem call! Returning to user mode.");
 }
 
 
@@ -378,11 +367,8 @@ void load_idt()
 	idt[0x0A].type_attr = 0xEE;
 
 	idt[0x0D].offset_low = ((uint32_t)isr_0x0D) & 0x0000FFFF;
-	idt[0x0D].offset_high = ((uint32_t)isr_0x0D >> 16) & 0x0000FFFF;
-	// 0x0018 selector for user mode...seems useful for debugging.
-	// Should be 0x0008 so that we let kernel mode handle the exceptions? need to be able to switch between
-	//   user and kernel mode first...	
-	idt[0x0D].selector = 0x0018;
+	idt[0x0D].offset_high = ((uint32_t)isr_0x0D >> 16) & 0x0000FFFF;	
+	idt[0x0D].selector = 0x0008;
 	idt[0x0D].zero = 0x00;
 	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
 	idt[0x0D].type_attr = 0xEE;
@@ -406,12 +392,13 @@ void user_mode()
 	
 	print("Now we're in user mode.\n");
 
-	// uncomment to make sure we are running in ring 3 (i.e. halt NOT allowed)
-	//asm("hlt");
-
 	asm("int 0x80");
 
-	print("\nNow we're back in user mode.");
+	print("\nNow we're back in user mode.\n");
+
+	asm("mov ebx, cs");
+	asm("mov cpl, ebx");
+	print_uint32_hex(cpl);
 
 	while(1);
 }
