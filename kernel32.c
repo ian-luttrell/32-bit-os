@@ -20,6 +20,22 @@ uint32_t kernel_main(void) {
 	print("Loading IDT...\n");
 	load_idt();
 	print("Done loading IDT.\n");
+	/*
+	// set timer frequency to "Hz" ticks per second
+	uint32_t Hz = 1000;	
+	uint32_t divisor = 1193180 / Hz;
+	uint8_t divisor_low_byte = divisor & 0xFF;
+	uint8_t divisor_high_byte = divisor >> 8;
+	asm (        "mov al, 0x36;\
+				  outb 0x43, al;\
+				  mov al, %0;\
+				  outb 0x40, al;\
+				  mov al, %1;\
+				  outb 0x40, al"
+				 :
+				 : "m" (divisor_low_byte), "m" (divisor_high_byte)
+		);
+	*/
 
 	// test "general protection fault" exception handler (in kernel mode)
 	//   (selector in interrupt/exception handler would need to be 0x0008, not 0x0018)
@@ -47,8 +63,6 @@ uint32_t kernel_main(void) {
 		"LEA EAX, [user_mode]\n"	
 		"PUSH EAX\n"
 		"IRETD");
-	
-	//int error = 5 / 0;	
 
 	return 0xDEADBEEF;
 }
@@ -330,6 +344,26 @@ __attribute__((interrupt)) void isr_0x80(uint32_t *ptr)
 }
 
 
+typedef struct
+{
+    unsigned int gs, fs, es, ds;
+    unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    unsigned int int_no, err_code;
+    unsigned int eip, cs, eflags, useresp, ss;
+} regs_t;
+
+
+__attribute__((interrupt)) void irq_0x00(regs_t *regs)
+{
+	asm("cli");
+	print("\n\nTimer interrupt generated.");
+
+	// send "end of interrupt" (EOI) signal to master PIC
+	asm volatile("mov al, 0x20;\
+				  outb 0x20, al");
+}
+
+
 typedef struct {
 	uint16_t offset_low;  // bits 0 through 15 of ISR address
 	uint16_t selector;  // code segment selector in GDT or LDT
@@ -349,41 +383,63 @@ typedef struct {
 idtr_contents_t idtr_contents;
 
 
+void set_idt_entry(uint16_t num, uint32_t *base, uint16_t selector, uint8_t flags)
+{
+	idt[num].offset_low = (uint32_t)base & 0x0000FFFF;
+	idt[num].offset_high = ((uint32_t)base >> 16) & 0x0000FFFF;	
+	idt[num].selector = selector;
+	idt[num].zero = 0x00;
+	idt[num].type_attr = flags;
+}
+
+
+void irq_remap()
+{
+	asm volatile("mov al, 0x11;\
+				  outb 0x20, al;\
+				  mov al, 0x11;\
+				  outb 0xA0, al;\
+				  mov al, 0x20;\
+				  outb 0x21, al;\
+				  mov al, 0x28;\
+				  outb 0xA1, al;\
+				  mov al, 0x04;\
+				  outb 0x21, al;\
+				  mov al, 0x02;\
+				  outb 0xA1, al;\
+				  mov al, 0x01;\
+				  outb 0x21, al;\
+				  mov al, 0x01;\
+				  outb 0xA1, al;\
+				  mov al, 0x00;\
+				  outb 0x21, al;\
+				  mov al, 0x00;\
+				  outb 0xA1, al");
+}
+	
+
+
 void load_idt()
 {
 	idtr_contents.limit = (256 * sizeof(idt_entry_t)) - 1;
 	idtr_contents.base = (uint32_t)idt;
 
-	idt[0x00].offset_low = ((uint32_t)isr_0x00) & 0x0000FFFF;
-	idt[0x00].offset_high = ((uint32_t)isr_0x00 >> 16) & 0x0000FFFF;
-	idt[0x00].selector = 0x0018;
-	idt[0x00].zero = 0x00;
-	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
-	// 11101110
-	idt[0x00].type_attr = 0xEE;
+	// exceptions
+	set_idt_entry(0x00, (uint32_t *)isr_0x00, 0x0008, 0xEE);
+	set_idt_entry(0x0A, (uint32_t *)isr_0x0A, 0x0008, 0xEE);
+	set_idt_entry(0x0D, (uint32_t *)isr_0x0D, 0x0008, 0xEE);
 
-	idt[0x0A].offset_low = ((uint32_t)isr_0x0A) & 0x0000FFFF;
-	idt[0x0A].offset_high = ((uint32_t)isr_0x0A >> 16) & 0x0000FFFF;
-	idt[0x0A].selector = 0x0018;
-	idt[0x0A].zero = 0x00;
-	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
-	idt[0x0A].type_attr = 0xEE;
+	// system call
+	set_idt_entry(0x80, (uint32_t *)isr_0x80, 0x0008, 0xEE);
 
-	idt[0x0D].offset_low = ((uint32_t)isr_0x0D) & 0x0000FFFF;
-	idt[0x0D].offset_high = ((uint32_t)isr_0x0D >> 16) & 0x0000FFFF;	
-	idt[0x0D].selector = 0x0008;
-	idt[0x0D].zero = 0x00;
-	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
-	idt[0x0D].type_attr = 0xEE;
-
-	idt[0x80].offset_low = ((uint32_t)isr_0x80) & 0x0000FFFF;
-	idt[0x80].offset_high = ((uint32_t)isr_0x80 >> 16) & 0x0000FFFF;	
-	idt[0x80].selector = 0x0008;
-	idt[0x80].zero = 0x00;
-	// present, caller DPL <= 3, type = 14 (32-bit interrupt)
-	idt[0x80].type_attr = 0xEE;
+	// remap PIC IRQ entry numbers
+	irq_remap();
+	// hardware interrupts (IRQs)
+	set_idt_entry(0x20, (uint32_t *)irq_0x00, 0x0008, 0x8E);
 
 	asm volatile("lidt [idtr_contents]");
+
+	asm volatile("sti");
 }
 
 
@@ -404,8 +460,7 @@ void user_mode()
 	asm("mov %0, ebx" : "=r"(cs_contents));
 	print_uint32_hex(cs_contents);
 
-	// commit a general protection fault, so our handler will halt the processor
-	asm("lidt [0xbeef]");
+	while(1);
 }
 
 
