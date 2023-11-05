@@ -5,7 +5,8 @@ ORG 0x7C00
 
 ; sector 1 of floppy, i.e. physical address 0x00007C00 in memory
 bootloader_stage_1:
-	MOV BX, 0x00		   
+
+	MOV BX, 0x00	   
 	MOV DS, BX
 
 	PUSHA
@@ -129,8 +130,8 @@ bootloader_stage_2:
    
 
 gdt_start: 
-	DD 0 				; required null descriptor (offset 0x00)
-	DD 0 
+	DD 0x00000000				; required null descriptor (offset 0x00)
+	DD 0x00000000 
   
 ; kernel code:			; code descriptor (offset 0x08)
 	DW 0xFFFF 			; limit low (in paragraphs)

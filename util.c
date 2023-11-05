@@ -1,0 +1,37 @@
+
+#include <stdint.h>
+#include <stddef.h>
+//#include <util.h>
+
+
+size_t strlen(const char* str) {
+	size_t len = 0;
+	while (str[len])
+		len++;
+	return len;
+}
+
+void memset(void *dest, uint8_t value, uint32_t byte_count) {
+	char *tmp = (char *)dest;
+	for ( ; byte_count != 0; byte_count--) {
+		*tmp++ = value;
+	}
+}
+
+void outb(uint16_t port, uint8_t value) {
+	asm volatile ("outb %0, %1\n" : : "Nd" (port), "a" (value): "memory");
+}
+
+uint8_t inb(uint16_t port) {
+	uint8_t ret;
+	asm volatile("inb %0, %1"
+					: "=a"(ret)
+					: "Nd"(port)
+					: "memory");
+
+	return ret;
+}
+
+void io_wait() {
+	outb(0x80, 0x00);  // port 0x80 is unused after BIOS POST
+}

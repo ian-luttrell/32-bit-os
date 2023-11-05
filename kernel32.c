@@ -1,14 +1,13 @@
 #include <stdbool.h> 
 #include <stddef.h>
 #include <stdint.h>
+#include "terminal.h"
+#include "print.h"
+#include "util.h"
+#include "pic.h"
+#include "paging.h"
 
-void terminal_initialize();
-void print(const char *);
-void terminal_putchar(uint8_t);
-size_t strlen(const char *);
-void print(const char *);
-void print_uint32_dec(uint32_t);
-void print_uint32_hex(uint32_t);
+
 void user_mode();
 void load_idt();
 void init_paging();
@@ -51,18 +50,31 @@ uint32_t kernel_main(void) {
 
 	// uncomment to go into user mode (i.e. the function user_mode())
 	
-	asm("MOV AX, 0x23\n"	
-		"MOV DS, AX\n"
+	print("\nAbout to jump to user mode. The ESP register currently contains: ");
+	uint32_t esp_contents;
+	asm("mov ebx, esp");
+	asm("mov %0, ebx" : "=r"(esp_contents));
+	print_uint32_hex(esp_contents);
+
+	vmmngr_initialize();
+
+	asm("CLI\n"
+		"MOV AX, 0x23\n"	
+		"MOV DS, AX\n"	// data segment selectors for user mode - 0x23 = 0x20 | 0x03 (selector in GDT ORed with Requested Privilege Level (RPL) of 3, for Ring 3)
 		"MOV ES, AX\n"
 		"MOV FS, AX\n"
 		"MOV GS, AX\n"
-		"PUSH 0x23\n"		
-		"PUSH ESP\n"		
-		"PUSHFD\n"			
-		"PUSH 0x1B\n"	
+		"MOV EAX, 0x000C0000\n"  // top of user mode stack
+		"PUSH 0x23\n"	// stack segment selector for user mode
+		"PUSH EAX\n"	// value of stack pointer upon IRET
+		"PUSHFD\n"		// value of EFLAGS register to be loaded upon IRET
+		"POP EAX\n"		// pop value of EFLAGS into EAX
+		"OR EAX, 0x200\n"  // enable interupt flag (IF) by ORing current EFLAGS with 0x200 (1000000000)
+		"PUSH EAX\n"	// now interrupts will be reenabled atomically (i.e. upon IRET, so we will already be safely in user mode)
+		"PUSH 0x1B\n"	// code segment selector for user mode (again, GDT selector is ORed with RPL of 3, i.e. 0x1B = 0x18 | 0x03)
 		"LEA EAX, [user_mode]\n"	
-		"PUSH EAX\n"
-		"IRETD");
+		"PUSH EAX\n"	// top of stack (lowest address) is set to the address where we will continue execution upon IRET
+		"IRETD");		// interrupt "return" to user mode
 
 	return 0xDEADBEEF;
 }
@@ -83,15 +95,8 @@ page_table_t kernel_page_table_1;
 // NEED TO READ NEXT TRACK OF FLOPPY TO GET THESE INTO RAM
 //page_table_t kernel_page_table_2, kernel_page_table_3, kernel_page_table_4, kernel_page_table_5;
 
-void enable_paging()
-{
-	asm("lea eax, [page_dir]\n"
-		"mov cr3, eax\n"
-		"mov eax, cr0\n"
-		"or eax, 0x80000001\n"
-		"mov cr0, eax");
-}
 
+/*
 void init_paging()
 {
 	// KERNEL'S FIRST PAGE
@@ -121,192 +126,13 @@ void init_paging()
 	page_dir.entry[4] |= ((uint32_t)&kernel_page_table_5) << 12;
 	page_dir.entry[4] |= 0x00000003;
 */
+/*
 	print("Set up page directory kernel entries.\n");
 
 	enable_paging();
 }
-
-
-/* Hardware text mode color constants. */
-enum vga_color {
-	VGA_COLOR_BLACK = 0,
-	VGA_COLOR_BLUE = 1,
-	VGA_COLOR_GREEN = 2,
-	VGA_COLOR_CYAN = 3,
-	VGA_COLOR_RED = 4,
-	VGA_COLOR_MAGENTA = 5,
-	VGA_COLOR_BROWN = 6,
-	VGA_COLOR_LIGHT_GREY = 7,
-	VGA_COLOR_DARK_GREY = 8,
-	VGA_COLOR_LIGHT_BLUE = 9,
-	VGA_COLOR_LIGHT_GREEN = 10,
-	VGA_COLOR_LIGHT_CYAN = 11,
-	VGA_COLOR_LIGHT_RED = 12,
-	VGA_COLOR_LIGHT_MAGENTA = 13,
-	VGA_COLOR_LIGHT_BROWN = 14,
-	VGA_COLOR_WHITE = 15,
-};
-
+*/
  
-static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {
-	return fg | bg << 4;
-}
- 
-static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
-	return (uint16_t) uc | (uint16_t) color << 8;
-}
- 
-size_t strlen(const char* str) {
-	size_t len = 0;
-	while (str[len])
-		len++;
-	return len;
-}
- 
-static const size_t VGA_WIDTH = 80;
-static const size_t VGA_HEIGHT = 25;
- 
-size_t terminal_row;
-size_t terminal_column;
-uint8_t terminal_color;
-uint16_t* terminal_buffer;
-
-void terminal_initialize(void) {
-	terminal_row = 0;
-	terminal_column = 0;
-	terminal_color = vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
-	terminal_buffer = (uint16_t*) 0xB8000;
-	for (size_t y = 0; y < VGA_HEIGHT; y++) {
-		for (size_t x = 0; x < VGA_WIDTH; x++) {
-			const size_t index = y * VGA_WIDTH + x;
-			terminal_buffer[index] = vga_entry(' ', terminal_color);
-		}
-	}
-}
- 
-void terminal_setcolor(uint8_t color) {
-	terminal_color = color;
-}
- 
-void terminal_putentryat(char c, uint8_t color, size_t x, size_t y) {
-	const size_t index = y * VGA_WIDTH + x;
-	terminal_buffer[index] = vga_entry(c, color);
-}
- 
- 
-void terminal_write(const char* data, size_t size) {
-	for (size_t i = 0; i < size; i++)
-		terminal_putchar(data[i]);
-}
- 
-void terminal_writestring(const char* data) {
-	terminal_write(data, strlen(data));
-}
-
-void print(const char *string) {
-	terminal_write(string, strlen(string));
-}
-
-void terminal_putchar(uint8_t byte) {
-	if (byte == '\n') {
-		terminal_row++;
-		terminal_column = 0;
-		return;
-	}
-	else
-		terminal_putentryat(byte, terminal_color, terminal_column, terminal_row);
-
-	if (++terminal_column == VGA_WIDTH) {
-		terminal_column = 0;
-		if (++terminal_row == VGA_HEIGHT)
-			terminal_row = 0;
-	}
-}
-
-
-
-uint32_t remainder;
-
-void print_uint32(uint32_t input)
-{
-	if (input == 0)
-		terminal_putchar(48);
-	else
-	{
-		uint32_t curr = input;
-		size_t digit_counter = 0;	
-		while (curr != 0)
-		{
-			remainder = curr % 10;
-			asm("push remainder");
-			digit_counter++;
-
-			curr -= remainder;
-			curr /= 10;		
-		}
-	
-		while (digit_counter > 0)
-		{
-			asm("pop remainder");
-			terminal_putchar(remainder + 48);
-			digit_counter--;
-		}
-	}
-}
-
-void print_uint32_hex(uint32_t input)
-{
-	if (input == 0)
-	{
-		terminal_writestring("0x00000000");
-	}
-	else
-	{
-		uint32_t curr = input;
-		size_t digit_counter = 0;	
-		while (curr != 0)
-		{
-			remainder = curr % 16;
-			asm("push remainder");
-			digit_counter++;
-
-			curr -= remainder;
-			curr /= 16;		
-		}
-	
-		terminal_writestring("0x");
-		while (digit_counter > 0)
-		{
-			asm("pop remainder");
-			switch(remainder) {
-				case 10:
-					terminal_putchar('A');
-					break;
-				case 11:
-					terminal_putchar('B');
-					break;
-				case 12:
-					terminal_putchar('C');
-					break;
-				case 13:
-					terminal_putchar('D');
-					break;				
-				case 14:
-					terminal_putchar('E');
-					break;
-				case 15:
-					terminal_putchar('F');
-					break;
-				default:
-					terminal_putchar(remainder + 48);
-			}
-
-			digit_counter--;
-		}
-	}
-}
-
-
 __attribute__((interrupt)) void isr_0x00(uint32_t *p)
 {
 	print("\n\nYou divided by zero! This is undefined in any (algebraic) ring.\nThe processor has been halted.");
@@ -334,11 +160,11 @@ __attribute__((interrupt)) void isr_0x0D(uint32_t *p)
 
 __attribute__((interrupt)) void isr_0x80(uint32_t *ptr)
 {
-	print("\n\nSystem call! The CS register currently contains: ");
-	uint32_t cs_contents;
-	asm("mov ebx, cs");
-	asm("mov %0, ebx" : "=r"(cs_contents));
-	print_uint32_hex(cs_contents);
+	print("\n\nSystem call!");
+	//print_reg_cs();
+	//print_reg_esp();
+
+	//memset((void *)0xB8000, 0x0010, 1000);  // testing the memset utility function on VGA RAM
 
 	print("\nReturning to user mode.");
 }
@@ -356,11 +182,51 @@ typedef struct
 __attribute__((interrupt)) void irq_0x00(regs_t *regs)
 {
 	asm("cli");
-	print("\n\nTimer interrupt generated.");
+	//print("\n\nTimer interrupt generated on 10/28/23.");
+	//print_reg_esp();
+	//print_reg_cs();
+	//send "end of interrupt" (EOI) signal to master PIC
+	PIC_sendEOI(0x00);
+	asm("sti");
+}
 
-	// send "end of interrupt" (EOI) signal to master PIC
-	asm volatile("mov al, 0x20;\
-				  outb 0x20, al");
+__attribute__((interrupt)) void irq_0x01(regs_t *regs)
+{
+	asm("cli");
+	//print("\n\nKeyboard interrupt generated!");
+	uint8_t byte;
+	byte = inb(0x60);
+	print("\nGot \n");	
+	print_uint32_hex(byte);
+	//print_reg_esp();
+	//print_reg_cs();
+
+	//send "end of interrupt" (EOI) signal to master PIC
+	PIC_sendEOI(0x01);
+	asm("sti");
+}
+
+__attribute__((interrupt)) void irq_0x0C(regs_t *regs)
+{
+	asm("cli");
+	print("\n\nMouse interrupt generated!");
+	print_reg_esp();
+	print_reg_cs();
+	//send "end of interrupt" (EOI) signal to master PIC
+	PIC_sendEOI(0x0C);
+	asm("sti");
+}
+
+__attribute__((interrupt)) void isr_0x0E(regs_t *regs)
+{
+	asm("cli");
+	print("\n\nPage fault exception!");
+	print_reg_esp();
+	print_reg_cs();
+
+	asm("hlt");  // need to do something instead of halting
+
+	asm("sti");
 }
 
 
@@ -392,50 +258,25 @@ void set_idt_entry(uint16_t num, uint32_t *base, uint16_t selector, uint8_t flag
 	idt[num].type_attr = flags;
 }
 
-
-void irq_remap()
-{
-	asm volatile("mov al, 0x11;\
-				  outb 0x20, al;\
-				  mov al, 0x11;\
-				  outb 0xA0, al;\
-				  mov al, 0x20;\
-				  outb 0x21, al;\
-				  mov al, 0x28;\
-				  outb 0xA1, al;\
-				  mov al, 0x04;\
-				  outb 0x21, al;\
-				  mov al, 0x02;\
-				  outb 0xA1, al;\
-				  mov al, 0x01;\
-				  outb 0x21, al;\
-				  mov al, 0x01;\
-				  outb 0xA1, al;\
-				  mov al, 0x00;\
-				  outb 0x21, al;\
-				  mov al, 0x00;\
-				  outb 0xA1, al");
-}
-	
-
-
 void load_idt()
 {
 	idtr_contents.limit = (256 * sizeof(idt_entry_t)) - 1;
 	idtr_contents.base = (uint32_t)idt;
 
-	// exceptions
-	set_idt_entry(0x00, (uint32_t *)isr_0x00, 0x0008, 0xEE);
-	set_idt_entry(0x0A, (uint32_t *)isr_0x0A, 0x0008, 0xEE);
-	set_idt_entry(0x0D, (uint32_t *)isr_0x0D, 0x0008, 0xEE);
-
-	// system call
-	set_idt_entry(0x80, (uint32_t *)isr_0x80, 0x0008, 0xEE);
-
-	// remap PIC IRQ entry numbers
-	irq_remap();
+	// remap PIC IRQ entry numbers to avoid overlap with 80386 processor interrupts
+	PIC_remap(0x20, 0x28);
 	// hardware interrupts (IRQs)
 	set_idt_entry(0x20, (uint32_t *)irq_0x00, 0x0008, 0x8E);
+	set_idt_entry(0x21, (uint32_t *)irq_0x01, 0x0008, 0x8E);
+	set_idt_entry(0x2B, (uint32_t *)irq_0x0C, 0x0008, 0x8E);
+
+	// exceptions (software interrupts)
+	set_idt_entry(0x00, (uint32_t *)isr_0x00, 0x0008, 0xEE);
+	set_idt_entry(0x0A, (uint32_t *)isr_0x0A, 0x0008, 0xEE);
+	set_idt_entry(0x0E, (uint32_t *)isr_0x0E, 0x0008, 0xEE);
+
+	// system call (software interrupt)
+	set_idt_entry(0x80, (uint32_t *)isr_0x80, 0x0008, 0xEE);
 
 	asm volatile("lidt [idtr_contents]");
 
@@ -447,18 +288,45 @@ void load_idt()
 
 void user_mode()
 {
-	asm("ADD ESP, 4");
-	
+	asm("add esp, 4");
+
 	print("\nNow we're in user mode.");
+
+	asm("int 0x80");  // system call
+
+	//print("\nNow we're back in user mode.");
+	//print_reg_cs();
+	//print_reg_esp();
 
 	asm("int 0x80");
 
-	print("\n\nNow we're back in user mode.\n");
-	print("The CS register currently contains: ");
-	uint32_t cs_contents;
-	asm("mov ebx, cs");
-	asm("mov %0, ebx" : "=r"(cs_contents));
-	print_uint32_hex(cs_contents);
+	//print("\nNow we're back in user mode.");
+	//print_reg_cs();
+	//print_reg_esp();
+	
+/*
+	uint8_t byte;
+	byte = inb(0x64);
+	print("\nPort 0x64 reads:\n");
+	print_uint32_hex(byte);
+
+	outb(0x60, 0xF5);
+	byte = inb(0x60);
+	while (byte != 0xFA);
+	print("\nGot byte ");
+	print_uint32_hex(byte);
+	outb(0x60, 0xF2);
+	byte = inb(0x60);
+	while (byte != 0xFA);
+print("\nGot byte ");
+	print_uint32_hex(byte);
+byte = inb(0x60);
+print("\nGot byte ");
+	print_uint32_hex(byte);
+	byte = inb(0x60);
+print("\nGot byte ");
+	print_uint32_hex(byte);
+*/
 
 	while(1);
 }
