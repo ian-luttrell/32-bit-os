@@ -7,11 +7,13 @@
  
 
 //uint32_t page_directory[1024] __attribute__((aligned(4096)));
-uint32_t *page_directory= (uint32_t *)0x012000;
+uint32_t *page_directory = (uint32_t *)0x00012000;
 //uint32_t kernel_page_table[1024] __attribute__((aligned(4096)));
-uint32_t *kernel_page_table= (uint32_t *)0x010000;
-uint32_t *user_code_page_table= (uint32_t *)0x010400;
-uint32_t *user_data_page_table= (uint32_t *)0x010800;
+uint32_t *shared_page_table = (uint32_t *)0x00010000;
+uint32_t *user_code_page_table = (uint32_t *)0x00410000;
+uint32_t *user_data_page_table = (uint32_t *)0x00810000;
+uint32_t *kernel_code_page_table = (uint32_t *)0x00C10000;
+uint32_t *kernel_data_page_table = (uint32_t *)0x01010000;
 
 void vmmngr_initialize () {
 /*
@@ -58,9 +60,9 @@ void vmmngr_initialize () {
 
 	for (i = 0; i < 1024; i++)
 	{
-		kernel_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
+		shared_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 	}
-	page_directory[0] = (uint32_t)kernel_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+	page_directory[0] = (uint32_t)shared_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	for (i = 0; i < 1024; i++)
 	{
 		user_code_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT);
@@ -71,6 +73,22 @@ void vmmngr_initialize () {
 		user_data_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 	}
 	page_directory[2] = (uint32_t)user_data_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+	for (i = 0; i < 1024; i++)
+	{
+		kernel_code_page_table[i] = (i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT);
+	}
+	page_directory[3] = (uint32_t)kernel_code_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT);	
+
+	// rest of the 4GiB of RAM will be kernel data for now
+	int dir_index;
+	for (dir_index = 4; dir_index < 1024; dir_index++)
+	{
+		for (i = 0; i < 1024; i++)
+		{
+			kernel_data_page_table[i] = (i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT | I86_PTE_WRITABLE);
+		}
+		page_directory[dir_index] = (uint32_t)kernel_data_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+	}
 
 	enable_paging(page_directory);
 }

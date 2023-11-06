@@ -201,6 +201,14 @@ __attribute__((interrupt)) void irq_0x01(regs_t *regs)
 	//print_reg_esp();
 	//print_reg_cs();
 
+	/* Load HLT opcode into a kernel data region and jump to it (i.e. execute HLT)
+			If we set "no execute" on that region, this should not work, even though we're in kernel mode	
+	asm("mov eax, 0xF4");
+	asm("mov ebx, 0x2000000");
+	asm("mov [ebx], eax");
+	asm("jmp 0x2000000");
+	*/
+
 	//send "end of interrupt" (EOI) signal to master PIC
 	PIC_sendEOI(0x01);
 	asm("sti");
@@ -292,41 +300,19 @@ void user_mode()
 
 	print("\nNow we're in user mode.");
 
+	// Test the ability to load "INT 0x00" into address (addr) = 0x87C0, i.e. write self-modifying code to the current page
+	//     This should only work if (addr) is in a user page (as it is here) and that page is both writeable and executable (i.e. is not W^X)
+	//     We can tell that it worked if we get a "divide by zero" exception (interrupt 0x00, i.e. opcode CD 00), and a resulting HALT, rather than the system call
+	asm("mov eax, 0x00CD");
+	asm("mov ebx, 0x000087C0");
+	asm("mov [ebx], eax");
+	asm("jmp ebx");
+
 	asm("int 0x80");  // system call
 
 	//print("\nNow we're back in user mode.");
 	//print_reg_cs();
 	//print_reg_esp();
-
-	asm("int 0x80");
-
-	//print("\nNow we're back in user mode.");
-	//print_reg_cs();
-	//print_reg_esp();
-	
-/*
-	uint8_t byte;
-	byte = inb(0x64);
-	print("\nPort 0x64 reads:\n");
-	print_uint32_hex(byte);
-
-	outb(0x60, 0xF5);
-	byte = inb(0x60);
-	while (byte != 0xFA);
-	print("\nGot byte ");
-	print_uint32_hex(byte);
-	outb(0x60, 0xF2);
-	byte = inb(0x60);
-	while (byte != 0xFA);
-print("\nGot byte ");
-	print_uint32_hex(byte);
-byte = inb(0x60);
-print("\nGot byte ");
-	print_uint32_hex(byte);
-	byte = inb(0x60);
-print("\nGot byte ");
-	print_uint32_hex(byte);
-*/
 
 	while(1);
 }
