@@ -6,14 +6,13 @@
 #include "print.h"
  
 
-//uint32_t page_directory[1024] __attribute__((aligned(4096)));
-uint32_t *page_directory = (uint32_t *)0x00012000;
-//uint32_t kernel_page_table[1024] __attribute__((aligned(4096)));
-uint32_t *shared_page_table = (uint32_t *)0x00010000;
-uint32_t *user_code_page_table = (uint32_t *)0x00410000;
-uint32_t *user_data_page_table = (uint32_t *)0x00810000;
-uint32_t *kernel_code_page_table = (uint32_t *)0x00C10000;
-uint32_t *kernel_data_page_table = (uint32_t *)0x01010000;
+uint32_t *page_directory = (uint32_t *)0x04000000;
+uint32_t *shared_page_table = (uint32_t *)     0x00000000;
+uint32_t *user_code_page_table = (uint32_t *)  0x00400000;
+uint32_t *user_data_page_table = (uint32_t *)  0x00800000;
+uint32_t *kernel_code_page_table = (uint32_t *)0x00C00000;
+uint32_t *kernel_data_page_table = (uint32_t *)0x01000000;
+
 
 void vmmngr_initialize () {
 /*
@@ -62,30 +61,33 @@ void vmmngr_initialize () {
 	{
 		shared_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 	}
+
 	page_directory[0] = (uint32_t)shared_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	for (i = 0; i < 1024; i++)
 	{
-		user_code_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT);
+		user_code_page_table[i] = ((uint32_t)user_code_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT);
 	}
 	page_directory[1] = (uint32_t)user_code_page_table | (I86_PDE_USER | I86_PDE_PRESENT);
+
 	for (i = 0; i < 1024; i++)
 	{
-		user_data_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
+		user_data_page_table[i] = ((uint32_t)user_data_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 	}
 	page_directory[2] = (uint32_t)user_data_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	for (i = 0; i < 1024; i++)
 	{
-		kernel_code_page_table[i] = (i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT);
+		kernel_code_page_table[i] = ((uint32_t)kernel_code_page_table + i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT);
 	}
 	page_directory[3] = (uint32_t)kernel_code_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT);	
 
-	// rest of the 4GiB of RAM will be kernel data for now
+	// rest of the 4GiB of RAM will be kernel data for now (but not really - all virtual RAM is mapped into the 4 MiB beginning at 0x01000000),
+	//     so multiple virtual addresses map to the same physical address. This will probably cause a program to overwrite its own data?
 	int dir_index;
 	for (dir_index = 4; dir_index < 1024; dir_index++)
 	{
 		for (i = 0; i < 1024; i++)
 		{
-			kernel_data_page_table[i] = (i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT | I86_PTE_WRITABLE);
+			kernel_data_page_table[i] = ((uint32_t)kernel_data_page_table + i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 		}
 		page_directory[dir_index] = (uint32_t)kernel_data_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	}

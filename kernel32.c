@@ -198,8 +198,8 @@ __attribute__((interrupt)) void irq_0x01(regs_t *regs)
 	byte = inb(0x60);
 	print("\nGot \n");	
 	print_uint32_hex(byte);
-	//print_reg_esp();
-	//print_reg_cs();
+	print_reg_esp();
+	print_reg_cs();
 
 	/* Load HLT opcode into a kernel data region and jump to it (i.e. execute HLT)
 			If we set "no execute" on that region, this should not work, even though we're in kernel mode	
@@ -303,10 +303,12 @@ void user_mode()
 	// Test the ability to load "INT 0x00" into address (addr) = 0x87C0, i.e. write self-modifying code to the current page
 	//     This should only work if (addr) is in a user page (as it is here) and that page is both writeable and executable (i.e. is not W^X)
 	//     We can tell that it worked if we get a "divide by zero" exception (interrupt 0x00, i.e. opcode CD 00), and a resulting HALT, rather than the system call
+	/*
 	asm("mov eax, 0x00CD");
 	asm("mov ebx, 0x000087C0");
 	asm("mov [ebx], eax");
 	asm("jmp ebx");
+	*/
 
 	asm("int 0x80");  // system call
 
