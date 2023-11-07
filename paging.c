@@ -80,16 +80,16 @@ void vmmngr_initialize () {
 	}
 	page_directory[3] = (uint32_t)kernel_code_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT);	
 
-	// rest of the 4GiB of RAM will be kernel data for now (but not really - all virtual RAM is mapped into the 4 MiB beginning at 0x01000000),
+	// rest of the 4GiB of RAM will be user data for now (but not really - all virtual RAM is mapped into the 4 MiB beginning at 0x01000000),
 	//     so multiple virtual addresses map to the same physical address. This will probably cause a program to overwrite its own data?
 	int dir_index;
 	for (dir_index = 4; dir_index < 1024; dir_index++)
 	{
 		for (i = 0; i < 1024; i++)
 		{
-			kernel_data_page_table[i] = ((uint32_t)kernel_data_page_table + i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT | I86_PTE_WRITABLE);
+			kernel_data_page_table[i] = ((uint32_t)kernel_data_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 		}
-		page_directory[dir_index] = (uint32_t)kernel_data_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+		page_directory[dir_index] = (uint32_t)kernel_data_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	}
 
 	enable_paging(page_directory);
