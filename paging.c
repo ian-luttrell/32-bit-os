@@ -6,13 +6,12 @@
 #include "print.h"
  
 
-uint32_t *page_directory = (uint32_t *)0x04000000;
-uint32_t *shared_page_table = (uint32_t *)     0x00000000;
-uint32_t *user_code_page_table = (uint32_t *)  0x00400000;
-uint32_t *user_data_page_table = (uint32_t *)  0x00800000;
-uint32_t *kernel_code_page_table = (uint32_t *)0x00C00000;
-uint32_t *kernel_data_page_table = (uint32_t *)0x01000000;
-
+uint32_t *page_directory_kernel_mode = (uint32_t *)  0x00040000;  // needs to be in kernel space
+uint32_t **kernel_data_pages = (uint32_t **)         0x00060004;  // do not overwrite when populating page directory (and needs to be in kernel space)
+uint32_t *shared_page_table = (uint32_t *)       	 0x00000000;
+uint32_t *user_code_page_table = (uint32_t *)    	 0x00400000;
+uint32_t *user_data_page_table = (uint32_t *)    	 0x00800000;
+uint32_t *kernel_code_page_table = (uint32_t *)  	 0x00C00000;
 
 void vmmngr_initialize () {
 /*
@@ -43,7 +42,7 @@ void vmmngr_initialize () {
 	// clear directory table
 	memset (dir, 0, sizeof (pdirectory));
 
-	pd_entry* entry = &dir->m_entries[PAGE_DIRECTORY_INDEX(0x00000000)];
+	pd_entry* entry = &dir->m_entries[page_directory_kernel_mode_INDEX(0x00000000)];
 	pd_entry_add_attrib (entry, I86_PDE_PRESENT);
 	pd_entry_add_attrib(entry, I86_PTE_KERNEL);
 	pd_entry_add_attrib (entry, I86_PDE_WRITABLE);
@@ -51,10 +50,10 @@ void vmmngr_initialize () {
 */
 
 
-	int i;
+	unsigned int i;
 	for (i = 0; i < 1024; i++)
 	{
-		memset((uint32_t *)page_directory[i], 0, sizeof(uint32_t));
+		memset((uint32_t *)page_directory_kernel_mode[i], 0, sizeof(uint32_t));
 	}
 
 	for (i = 0; i < 1024; i++)
@@ -62,37 +61,39 @@ void vmmngr_initialize () {
 		shared_page_table[i] = (i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 	}
 
-	page_directory[0] = (uint32_t)shared_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+	page_directory_kernel_mode[0] = (uint32_t)shared_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	for (i = 0; i < 1024; i++)
 	{
 		user_code_page_table[i] = ((uint32_t)user_code_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT);
 	}
-	page_directory[1] = (uint32_t)user_code_page_table | (I86_PDE_USER | I86_PDE_PRESENT);
+	page_directory_kernel_mode[1] = (uint32_t)user_code_page_table | (I86_PDE_USER | I86_PDE_PRESENT);
 
 	for (i = 0; i < 1024; i++)
 	{
 		user_data_page_table[i] = ((uint32_t)user_data_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 	}
-	page_directory[2] = (uint32_t)user_data_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+	page_directory_kernel_mode[2] = (uint32_t)user_data_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	for (i = 0; i < 1024; i++)
 	{
 		kernel_code_page_table[i] = ((uint32_t)kernel_code_page_table + i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT);
 	}
-	page_directory[3] = (uint32_t)kernel_code_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT);	
+	page_directory_kernel_mode[3] = (uint32_t)kernel_code_page_table | (I86_PDE_KERNEL | I86_PDE_PRESENT);	
 
-	// rest of the 4GiB of RAM will be user data for now (but not really - all virtual RAM is mapped into the 4 MiB beginning at 0x01000000),
-	//     so multiple virtual addresses map to the same physical address. This will probably cause a program to overwrite its own data?
-	int dir_index;
-	for (dir_index = 4; dir_index < 1024; dir_index++)
+	unsigned int dir_index;
+	*kernel_data_pages = (uint32_t *)0x01000000;
+	uint32_t *kernel_data_frame_start = *kernel_data_pages;  // initialize first frame to start of kernel data range
+	for (dir_index = 4; dir_index < 120; dir_index++)  // allocate 112 MiB of kernel data pages (do not overwrite video RAM), so we have 128 MiB mapped in total
 	{
 		for (i = 0; i < 1024; i++)
 		{
-			kernel_data_page_table[i] = ((uint32_t)kernel_data_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PTE_WRITABLE);
+			kernel_data_frame_start[i] = ((uint32_t)kernel_data_frame_start + i * 0x1000) | (I86_PTE_KERNEL | I86_PTE_PRESENT | I86_PTE_WRITABLE);
 		}
-		page_directory[dir_index] = (uint32_t)kernel_data_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+		page_directory_kernel_mode[dir_index] = (uint32_t)kernel_data_frame_start | (I86_PDE_KERNEL | I86_PDE_PRESENT | I86_PDE_WRITABLE);
+		
+		kernel_data_frame_start += 0x00400000 / sizeof(kernel_data_frame_start);  // 4MiB between each page directory entry (1024 frames * 4096 bytes/frame = 4 MiB)
 	}
 
-	enable_paging(page_directory);
+	enable_paging(page_directory_kernel_mode);
 }
 
 extern void pt_entry_add_attrib (pt_entry* e, uint32_t attrib) {

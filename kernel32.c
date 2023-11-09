@@ -312,21 +312,6 @@ void user_mode()
 
 	asm("int 0x80");  // system call
 
-	uint32_t* p1 = (uint32_t*) 0xfdbff000;  // mapped to physical address 0x013ff000
-	uint32_t* p2 = (uint32_t*) 0xfffff000;	// also mapped to 0x013ff000
-	memset(p1, 0, sizeof(uint32_t));
-	memset(p2, 0, sizeof(uint32_t));
-	print("\n\nInitialized address 1 to ");
-	print_uint32_hex(*p1);
-	print("\nInitialized address 2 to ");	
-	print_uint32_hex(*p2);
-	print("\n");
-	*p1 = 1337;
-	print("Value in address 1 set to ");
-	print_uint32_hex(*p1);
-	print("\nBut now value in address 2 is also ");
-	print_uint32_hex(*p2);
-	
 	//print("\nNow we're back in user mode.");
 	//print_reg_cs();
 	//print_reg_esp();
