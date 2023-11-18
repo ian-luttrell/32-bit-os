@@ -60,6 +60,10 @@ void print_uint32_hex(uint32_t input)
 		}
 	
 		terminal_writestring("0x");
+		for(uint8_t i = 0; i < 8 - digit_counter; i++) {
+			terminal_writestring("0");
+		}
+
 		while (digit_counter > 0)
 		{
 			asm("pop remainder");
@@ -88,6 +92,52 @@ void print_uint32_hex(uint32_t input)
 
 			digit_counter--;
 		}
+	}
+}
+
+void print_uint16_bin(uint16_t input)
+{
+	uint16_t mask = 0x8000;
+	while (mask) {
+		if (mask & input) {
+			terminal_putchar('1');
+		}
+		else {
+			terminal_putchar('0');
+		}
+
+		if (mask & 0x1110) {  // print a space after each nibble
+			terminal_putchar(' ');
+		} 
+
+		mask >>= 1;
+	}
+}
+
+void print_uint16_bits(uint16_t input)
+{
+	uint16_t mask = 0x8000;
+	uint32_t bit_pos = 15;
+	while (mask) {
+		print("\nBit ");
+		if (bit_pos >= 10) {
+			print_uint32(bit_pos);
+		}
+		else {
+			print("0");
+			print_uint32(bit_pos);
+		}
+		print(": ");
+	
+		if (mask & input) {
+			terminal_putchar('1');
+		}
+		else {
+			terminal_putchar('0');
+		}
+
+		mask >>= 1;
+		bit_pos--;
 	}
 }
 

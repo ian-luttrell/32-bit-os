@@ -1,7 +1,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-//#include <util.h>
+#include "util.h"
 
 
 size_t strlen(const char* str) {
@@ -31,6 +31,22 @@ uint8_t inb(uint16_t port) {
 
 	return ret;
 }
+
+void outw(uint32_t port, uint32_t value) {
+	asm volatile ("mov EAX, %0\n" : : "m"(value));
+	asm volatile ("mov EDX, %0\n" : : "m"(port));
+	asm volatile ("out DX, EAX\n");
+}
+
+uint32_t inw(uint32_t port) {
+	uint32_t ret;
+	asm volatile ("mov EDX, %0\n" : : "m"(port));
+	asm volatile ("in EAX, DX\n");
+	asm volatile("mov %0, EAX\n" : "=r"(ret) : : "memory");
+
+	return ret;
+}
+
 
 void io_wait() {
 	outb(0x80, 0x00);  // port 0x80 is unused after BIOS POST

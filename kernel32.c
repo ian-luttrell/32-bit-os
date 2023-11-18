@@ -6,6 +6,8 @@
 #include "util.h"
 #include "pic.h"
 #include "paging.h"
+#include "pci.h"
+#include "ata.h"
 
 
 void user_mode();
@@ -190,16 +192,95 @@ __attribute__((interrupt)) void irq_0x00(regs_t *regs)
 	asm("sti");
 }
 
-__attribute__((interrupt)) void irq_0x01(regs_t *regs)
+__attribute__((interrupt))void irq_0x01(regs_t *regs)
 {
 	asm("cli");
 	//print("\n\nKeyboard interrupt generated!");
+
 	uint8_t byte;
 	byte = inb(0x60);
+	terminal_initialize();
 	print("\nGot \n");	
 	print_uint32_hex(byte);
-	print_reg_esp();
-	print_reg_cs();
+	//print_reg_esp();
+	//print_reg_cs();
+
+	if (!ata_wait(1000000, 0x80)) {
+		print("\nATA controller timed out. Halting.");
+		asm("cli");
+		asm("hlt");
+	}
+
+	uint8_t status = ata_read_status();
+	print("\nATA status: ");
+	print_uint32_hex((uint32_t)status);
+	print(": ");
+	print_uint16_bin((uint16_t)status);
+asm("cli");
+	outb(0x01F6, 0xA0);
+	for(uint32_t i = 0; i < 0xFFF; i++) {
+		io_wait();
+	}
+	outb(0x01F2, 0x00);
+for(uint32_t i = 0; i < 0xFFF; i++) {
+		io_wait();
+	}
+	outb(0x01F3, 0x00);
+for(uint32_t i = 0; i < 0xFFF; i++) {
+		io_wait();
+	}
+	outb(0x01F4, 0x00);
+for(uint32_t i = 0; i < 0xFFF; i++) {
+		io_wait();
+	}
+	outb(0x01F5, 0x00);
+for(uint32_t i = 0; i < 0xFFF; i++) {
+		io_wait();
+	}
+	outb(0x01F7, 0xEC);
+	while((inb(0x01F7) & 0x08) == 0) {
+		continue;
+	}
+print("\n");
+	for(uint32_t i = 0; i < 20; i++) {
+		uint16_t val = inw(0x01F0);
+
+		print("\n");
+		print_uint32_hex(val);
+		print(": ");	
+		print_uint16_bin(val);
+	}
+asm("hlt");
+/*
+	uint8_t bus = 0x00;
+	uint8_t device = 0x00;
+	uint8_t function = 0x00;
+	uint8_t register_num = 0x00;
+
+
+	print("\n");
+	// loop through register 0 of each PCI device's functions and show its configuration header
+	for (device = 1; device < 2; device++) {
+		for (function = 1; function < 2; function++) {
+			for (register_num = 0; register_num < 3; register_num++) {
+				pci_config_read(bus, device, function, register_num);
+			}
+			for (register_num = 6; register_num < 10; register_num++) {
+				pci_config_read(bus, device, function, register_num);
+			}
+		}
+/*
+		for(register_num = 0; register_num < 12; register_num++) {
+			pci_config_read(bus, device, function, register_num);
+		}
+*/
+
+//		pci_config_read(bus, device, function, 0);
+//		pci_config_read(bus, device, function, 3);
+//		pci_config_read(bus, device, function, 6);
+//		pci_config_read(bus, device, function, 7);
+//		pci_config_read(bus, device, function, 15);
+//	}
 
 	/* Load HLT opcode into a kernel data region and jump to it (i.e. execute HLT)
 			If we set "no execute" on that region, this should not work, even though we're in kernel mode	
