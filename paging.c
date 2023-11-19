@@ -64,9 +64,9 @@ void vmmngr_initialize () {
 	page_directory_kernel_mode[0] = (uint32_t)shared_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 	for (i = 0; i < 1024; i++)
 	{
-		user_code_page_table[i] = ((uint32_t)user_code_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT);
+		user_code_page_table[i] = ((uint32_t)user_code_page_table + i * 0x1000) | (I86_PTE_USER | I86_PTE_PRESENT | I86_PDE_WRITABLE);
 	}
-	page_directory_kernel_mode[1] = (uint32_t)user_code_page_table | (I86_PDE_USER | I86_PDE_PRESENT);
+	page_directory_kernel_mode[1] = (uint32_t)user_code_page_table | (I86_PDE_USER | I86_PDE_PRESENT | I86_PDE_WRITABLE);
 
 	for (i = 0; i < 1024; i++)
 	{

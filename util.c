@@ -38,16 +38,18 @@ void outw(uint32_t port, uint32_t value) {
 	asm volatile ("out DX, EAX\n");
 }
 
-uint32_t inw(uint32_t port) {
-	uint32_t ret;
-	asm volatile ("mov EDX, %0\n" : : "m"(port));
-	asm volatile ("in EAX, DX\n");
-	asm volatile("mov %0, EAX\n" : "=r"(ret) : : "memory");
+uint16_t inw(uint16_t port) {
+	uint16_t ret;
+	asm volatile ("mov DX, %0\n" : : "m"(port));
+	asm volatile ("in AX, DX\n");
+	asm volatile("mov %0, AX\n" : "=r"(ret) : : "memory");
 
 	return ret;
 }
 
 
 void io_wait() {
-	outb(0x80, 0x00);  // port 0x80 is unused after BIOS POST
+	for (int i = 0; i < 100; i++) {	
+		outb(0x80, 0x00);  // port 0x80 is unused after BIOS POST
+	}
 }

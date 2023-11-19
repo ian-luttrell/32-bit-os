@@ -205,18 +205,90 @@ __attribute__((interrupt))void irq_0x01(regs_t *regs)
 	//print_reg_esp();
 	//print_reg_cs();
 
-	if (!ata_wait(1000000, 0x80)) {
-		print("\nATA controller timed out. Halting.");
+	uint8_t drive = 0;
+	ata_reset(drive);
+
+	uint8_t sect_cnt = ata_read_sect_count(drive);
+	print("\nATA sector count: ");
+	print_uint32_hex((uint32_t)sect_cnt);
+	print(": ");
+	print_uint16_bin((uint16_t)sect_cnt);
+
+	uint8_t sect_num = ata_read_sect_number(drive);
+	print("\nATA sector number: ");
+	print_uint32_hex((uint32_t)sect_num);
+	print(": ");
+	print_uint16_bin((uint16_t)sect_num);
+
+	if (!ata_wait(100000, ATA_DRIVE_READY)) {
+		print("\nATA controller timed out (not ready). Halting.");
+		print("\nATA status register: ");
+		print_uint32_hex(ata_read_status());
 		asm("cli");
 		asm("hlt");
 	}
 
-	uint8_t status = ata_read_status();
-	print("\nATA status: ");
+/*
+	ata_select_drive(drive);
+	outb(ATA_SECT_NUMBER, 0x01);
+	outb(ATA_SECT_COUNT, 0x01);
+	outb(ATA_HEAD, 0x00);
+	outb(ATA_CYL_LOW, 0x00);
+	outb(ATA_CYL_HIGH, 0x00);
+	outb(ATA_DATA, 0xA1);
+	outb(ATA_COMMAND, 0x30);
+	if (!ata_wait(100000, ATA_DRIVE_READY)) {
+		print("\nATA controller timed out on write. Halting.");
+		print("\nATA status register: ");
+		print_uint32_hex(ata_read_status());
+		asm("cli");
+		asm("hlt");
+	}
+	print("\nATA error register after write: ");
+	print_uint32_hex(ata_read_error());
+*/
+
+	ata_select_drive(drive);
+	outb(ATA_SECT_NUMBER, 0x01);
+	outb(ATA_SECT_COUNT, 4);
+	outb(ATA_FEATURES, 0x00);
+	outb(ATA_HEAD, 0x00);
+	outb(ATA_CYL_LOW, 0x00);
+	outb(ATA_CYL_HIGH, 0x00);
+	outb(ATA_STATUS, 0x20);
+	io_wait();
+	if (!ata_wait(100000, ATA_DRIVE_READY)) {
+		print("\nATA controller timed out on read. Halting.");
+		print("\nATA status register: ");
+		print_uint32_hex(ata_read_status());
+		print("\nATA error register: ");
+		print_uint32_hex(ata_read_error());
+		asm("cli");
+		asm("hlt");
+	}
+
+	uint16_t *hd_buffer = (uint16_t *)0x00800000;
+	uint8_t byte_1;
+	uint8_t byte_2;
+	for (int i = 0; i < 8; i++) {
+		ata_wait_busy(100000);
+		ata_wait(100000, ATA_DATA_READY);
+		*(hd_buffer + i) = inw(ATA_DATA);
+		byte_1 = (uint8_t)(*(hd_buffer + i) >> 8);
+		byte_2 = (uint8_t)*(hd_buffer + i);
+		print("\n");
+		print_uint32_hex((uint32_t)((byte_1 | (byte_2 << 8))));
+	}
+
+	print("\n\n");
+	uint32_t status = ata_read_status();
+	print("\nATA status: \n");
 	print_uint32_hex((uint32_t)status);
 	print(": ");
 	print_uint16_bin((uint16_t)status);
-asm("cli");
+	asm("cli");
+	asm("hlt");
+/*
 	outb(0x01F6, 0xA0);
 	for(uint32_t i = 0; i < 0xFFF; i++) {
 		io_wait();
@@ -237,11 +309,15 @@ for(uint32_t i = 0; i < 0xFFF; i++) {
 for(uint32_t i = 0; i < 0xFFF; i++) {
 		io_wait();
 	}
-	outb(0x01F7, 0xEC);
-	while((inb(0x01F7) & 0x08) == 0) {
-		continue;
+	
+	outb(ATA_STATUS, ATA_COMMAND_IDENTIFY);
+	if (!ata_wait(1000000, 0x08)) {
+		print("\nATA controller timed out. Halting.");
+		asm("cli");
+		asm("hlt");
 	}
-print("\n");
+
+	print("\n");
 	for(uint32_t i = 0; i < 20; i++) {
 		uint16_t val = inw(0x01F0);
 
@@ -250,7 +326,7 @@ print("\n");
 		print(": ");	
 		print_uint16_bin(val);
 	}
-asm("hlt");
+*/
 /*
 	uint8_t bus = 0x00;
 	uint8_t device = 0x00;
@@ -291,8 +367,8 @@ asm("hlt");
 	*/
 
 	//send "end of interrupt" (EOI) signal to master PIC
-	PIC_sendEOI(0x01);
-	asm("sti");
+	//PIC_sendEOI(0x01);
+	//asm("sti");
 }
 
 __attribute__((interrupt)) void irq_0x0C(regs_t *regs)

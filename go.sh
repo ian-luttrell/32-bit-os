@@ -14,4 +14,7 @@ i686-elf-ld -T link.ld kernel32.o terminal.o print.o util.o pic.o paging.o pci.o
 dd if=boot.bin of=os.flp &&
 dd oflag=append conv=notrunc if=kernel32.img of=os.flp &&
 #/usr/bin/bochs 'boot:floppy' 'floppya: 1_44=os.flp, status=inserted'
-qemu-system-i386 -cpu pentium3 -fda os.flp -monitor stdio -drive file=hdd.img,media=disk,format=raw
+#qemu-system-i386 -cpu pentium3 -fda os.flp -monitor stdio -drive id=disk,file=hdd.img,media=disk,format=raw
+
+qemu-system-i386 -cpu pentium3 -monitor stdio -fda os.flp -drive id=disk,file=hdd.img,if=none,format=raw -device ide-hd,drive=disk,bus=ide.0,id=ide-controller
+
