@@ -32,10 +32,10 @@ uint8_t inb(uint16_t port) {
 	return ret;
 }
 
-void outw(uint32_t port, uint32_t value) {
-	asm volatile ("mov EAX, %0\n" : : "m"(value));
-	asm volatile ("mov EDX, %0\n" : : "m"(port));
-	asm volatile ("out DX, EAX\n");
+void outw(uint16_t port, uint16_t value) {
+	asm volatile ("mov AX, %0\n" : : "m"(value));
+	asm volatile ("mov DX, %0\n" : : "m"(port));
+	asm volatile ("out DX, AX\n");
 }
 
 uint16_t inw(uint16_t port) {

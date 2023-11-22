@@ -24,7 +24,8 @@
 
 #define ATA_COMMAND_IDENTIFY 			0xEC
 #define ATA_COMMAND_RESET    			0x04
-#define ATA_COMMAND_READ_SECT_NO_RETRY 0x20
+#define ATA_COMMAND_READ_SECT_NO_RETRY  0x20
+#define ATA_COMMAND_WRITE_SECT_NO_RETRY 0x30
 
 #define BYTES_PER_SECTOR                512   // should actually get this from IDENTIFY command
 
@@ -37,5 +38,6 @@ uint8_t ata_read_error();
 uint8_t ata_read_sect_count(uint8_t drive);
 uint8_t ata_read_sect_number(uint8_t drive);
 size_t ata_pio_read(uint16_t start_sect, uint16_t sect_count, uint8_t features, uint8_t drive_head, uint16_t cylinder, uint16_t *buffer);
+size_t ata_pio_write(uint16_t start_sect, uint16_t sect_count, uint8_t features, uint8_t drive_head, uint16_t cylinder, uint16_t *buffer);
 
 #endif

@@ -228,33 +228,16 @@ __attribute__((interrupt))void irq_0x01(regs_t *regs)
 		asm("hlt");
 	}
 
-/*
-	ata_select_drive(drive);
-	outb(ATA_SECT_NUMBER, 0x01);
-	outb(ATA_SECT_COUNT, 0x01);
-	outb(ATA_HEAD, 0x00);
-	outb(ATA_CYL_LOW, 0x00);
-	outb(ATA_CYL_HIGH, 0x00);
-	outb(ATA_DATA, 0xA1);
-	outb(ATA_COMMAND, 0x30);
-	if (!ata_wait(100000, ATA_DRIVE_READY)) {
-		print("\nATA controller timed out on write. Halting.");
-		print("\nATA status register: ");
-		print_uint32_hex(ata_read_status());
-		asm("cli");
-		asm("hlt");
-	}
-	print("\nATA error register after write: ");
-	print_uint32_hex(ata_read_error());
-*/
-
 	ata_select_drive(drive);	
 	uint16_t *hd_buffer = (uint16_t *)0x00800000;
-	uint16_t start_sect = 6;
-	uint16_t sect_count = 1;
+	uint16_t start_sect = 1;
+	uint16_t sect_count = 20;
 	uint8_t features = 0x00;
 	uint8_t drive_head = 0;
 	uint16_t cylinder = 0;
+
+	hd_buffer = (uint16_t *)0x00007C00;  // we will write 5 sectors of kernel loaded from floppy
+	ata_pio_write(start_sect, sect_count, features, drive_head, cylinder, hd_buffer);
 
 	if (ata_pio_read(start_sect, sect_count, features, drive_head, cylinder, hd_buffer) == 0) {
 		uint8_t byte_1;
