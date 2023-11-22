@@ -95,6 +95,71 @@ void print_uint32_hex(uint32_t input)
 	}
 }
 
+void print_uint16_hex(uint16_t input, hex_option option)
+{
+
+	if (input == 0)
+	{
+		switch(option) {
+			case ZERO_X: terminal_writestring("0x0000 "); break;
+			case SPACE: terminal_writestring("0000 "); break;
+			default: terminal_writestring("0x0000 "); break;
+		}
+	}
+	else
+	{
+		uint16_t curr = input;
+		size_t digit_counter = 0;	
+		while (curr != 0)
+		{
+			remainder = curr % 16;
+			asm("push remainder");
+			digit_counter++;
+
+			curr -= remainder;
+			curr /= 16;		
+		}
+	
+		switch(option) {
+			case ZERO_X: terminal_writestring("0x"); break;
+			default: break;
+		}
+		for(uint8_t i = 0; i < 4 - digit_counter; i++) {
+			terminal_writestring("0");
+		}
+
+		while (digit_counter > 0)
+		{
+			asm("pop remainder");
+			switch(remainder) {
+				case 10:
+					terminal_putchar('A');
+					break;
+				case 11:
+					terminal_putchar('B');
+					break;
+				case 12:
+					terminal_putchar('C');
+					break;
+				case 13:
+					terminal_putchar('D');
+					break;				
+				case 14:
+					terminal_putchar('E');
+					break;
+				case 15:
+					terminal_putchar('F');
+					break;
+				default:
+					terminal_putchar(remainder + 48);
+			}
+
+			digit_counter--;
+		}
+		terminal_writestring(" ");
+	}
+}
+
 void print_uint16_bin(uint16_t input)
 {
 	uint16_t mask = 0x8000;

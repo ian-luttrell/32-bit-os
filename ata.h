@@ -22,8 +22,11 @@
 #define ATA_DRIVE_READY       0x40
 #define ATA_DATA_READY        0x08
 
-#define ATA_COMMAND_IDENTIFY 0xEC
-#define ATA_COMMAND_RESET    0x04
+#define ATA_COMMAND_IDENTIFY 			0xEC
+#define ATA_COMMAND_RESET    			0x04
+#define ATA_COMMAND_WRITE_SECT_NO_RETRY 0x20
+
+#define BYTES_PER_SECTOR                512   // should actually get this from IDENTIFY command
 
 bool ata_wait(uint32_t ticks, uint8_t condition_mask);
 bool ata_wait_busy(uint32_t ticks);
@@ -33,6 +36,6 @@ uint8_t ata_read_status();
 uint8_t ata_read_error();
 uint8_t ata_read_sect_count(uint8_t drive);
 uint8_t ata_read_sect_number(uint8_t drive);
-
+size_t ata_pio_read(uint16_t start_sect, uint16_t sect_count, uint8_t features, uint8_t drive_head, uint16_t cylinder, uint16_t *buffer);
 
 #endif

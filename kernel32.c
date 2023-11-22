@@ -248,44 +248,30 @@ __attribute__((interrupt))void irq_0x01(regs_t *regs)
 	print_uint32_hex(ata_read_error());
 */
 
-	ata_select_drive(drive);
-	outb(ATA_SECT_NUMBER, 0x01);
-	outb(ATA_SECT_COUNT, 4);
-	outb(ATA_FEATURES, 0x00);
-	outb(ATA_HEAD, 0x00);
-	outb(ATA_CYL_LOW, 0x00);
-	outb(ATA_CYL_HIGH, 0x00);
-	outb(ATA_STATUS, 0x20);
-	io_wait();
-	if (!ata_wait(100000, ATA_DRIVE_READY)) {
-		print("\nATA controller timed out on read. Halting.");
-		print("\nATA status register: ");
-		print_uint32_hex(ata_read_status());
-		print("\nATA error register: ");
-		print_uint32_hex(ata_read_error());
-		asm("cli");
-		asm("hlt");
-	}
-
+	ata_select_drive(drive);	
 	uint16_t *hd_buffer = (uint16_t *)0x00800000;
-	uint8_t byte_1;
-	uint8_t byte_2;
-	for (int i = 0; i < 8; i++) {
-		ata_wait_busy(100000);
-		ata_wait(100000, ATA_DATA_READY);
-		*(hd_buffer + i) = inw(ATA_DATA);
-		byte_1 = (uint8_t)(*(hd_buffer + i) >> 8);
-		byte_2 = (uint8_t)*(hd_buffer + i);
+	uint16_t start_sect = 6;
+	uint16_t sect_count = 1;
+	uint8_t features = 0x00;
+	uint8_t drive_head = 0;
+	uint16_t cylinder = 0;
+
+	if (ata_pio_read(start_sect, sect_count, features, drive_head, cylinder, hd_buffer) == 0) {
+		uint8_t byte_1;
+		uint8_t byte_2;
+
 		print("\n");
-		print_uint32_hex((uint32_t)((byte_1 | (byte_2 << 8))));
+		//for (int i = 0; i < (BYTES_PER_SECTOR * sect_count)/BYTES_PER_WORD; i++) {
+		for (int i = 0; i < (BYTES_PER_SECTOR * 1)/BYTES_PER_WORD; i++) { // limit output to 1 sector due to currently fixed terminal
+			byte_1 = (uint8_t)(*(hd_buffer + i) >> 8);
+			byte_2 = (uint8_t)*(hd_buffer + i);
+			print_uint16_hex((uint16_t)((byte_1 | (byte_2 << 8))), SPACE);
+		}
+	}
+	else {
+		print("Failed to read IDE HDD.\n");
 	}
 
-	print("\n\n");
-	uint32_t status = ata_read_status();
-	print("\nATA status: \n");
-	print_uint32_hex((uint32_t)status);
-	print(": ");
-	print_uint16_bin((uint16_t)status);
 	asm("cli");
 	asm("hlt");
 /*

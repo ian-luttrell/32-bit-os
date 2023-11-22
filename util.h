@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#define BYTES_PER_WORD 2
+
 size_t strlen(const char* str);
 void memset(void *dest, uint8_t value, uint32_t byte_count);
 void outb(uint16_t port, uint8_t value);
