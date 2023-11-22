@@ -21,6 +21,7 @@ uint32_t kernel_main(void) {
 	print("Loading IDT...\n");
 	load_idt();
 	print("Done loading IDT.\n");
+
 	/*
 	// set timer frequency to "Hz" ticks per second
 	uint32_t Hz = 1000;	
@@ -76,6 +77,7 @@ uint32_t kernel_main(void) {
 		"PUSH 0x1B\n"	// code segment selector for user mode (again, GDT selector is ORed with RPL of 3, i.e. 0x1B = 0x18 | 0x03)
 		"LEA EAX, [user_mode]\n"	
 		"PUSH EAX\n"	// top of stack (lowest address) is set to the address where we will continue execution upon IRET
+		//"hlt\n"
 		"IRETD");		// interrupt "return" to user mode
 
 	return 0xDEADBEEF;

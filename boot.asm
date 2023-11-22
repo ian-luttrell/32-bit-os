@@ -90,16 +90,19 @@ bootloader_stage_2:
 	;     entry point and use that to determine the floppy sector and
 	;	  memory location to use ... see elf_read.txt for code)
 
+	MOV AX, WORD [0x8218]
+	MOV [elf_entry], AX
+
 	PUSHA
-	MOV AH, 0x02	   
-	MOV AL, 50			; reserve kernel space		   
-	MOV CL, 6		   
-	MOV CH, 0		   
+	MOV AH, 0x02
+	MOV AL, 50		       ; reserve kernel space for any additions to stage 2 bootloader		   
+	MOV CL, 6		       ; starting sector to read, assuming kernel starts on sector 6 of boot media
+	MOV CH, 0
 	MOV DH, 0		   
 	            	   
-	MOV BX, 0x00	   
+	MOV BX, 0x00
 	MOV ES, BX
-	MOV BX, 0x8400	   
+	MOV BX, WORD [elf_entry]    ; kernel entry point (offset 0x18 in ELF header)
 	INT 0x13
 	POPA
 	
@@ -127,10 +130,9 @@ bootloader_stage_2:
 
 	; keep running in ring 0
 	JMP 0x08:kernel_mode
-   
 
 gdt_start: 
-	DD 0x00000000				; required null descriptor (offset 0x00)
+	DD 0x00000000		; required null descriptor (offset 0x00)
 	DD 0x00000000 
   
 ; kernel code:			; code descriptor (offset 0x08)
@@ -167,7 +169,7 @@ gdt_start:
 
 ; task state segment for going to ring 0 from ring 3 (offset 0x28)
 	DW 0x0000			; limit low (in paragraphs)
-	DW 0x7E8C 			; base low
+	DW tss 			    ; base low
 	DB 00000000B 		; base middle
 	; access bit 4 must be cleared for TSS descriptor (and other system descriptors)	
 	DB 10001001B 		; access
@@ -239,13 +241,15 @@ tss:
 	DW 0x0000           ; reserved
 	DW 0x0000           ; IOPB offset
 
+elf_entry:
+	DW 0x0000           ; to store kernel entry point
 
 BITS 32
 
 kernel_mode:
 	
 	; call into entry point of kernel (i.e. the function kernel_main())
-	CALL 0x8400
+	CALL WORD [elf_entry]
 
 times 1024-($-$$) DB 0		; Pad rest of sector
 
