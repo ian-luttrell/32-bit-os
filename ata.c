@@ -106,7 +106,7 @@ size_t ata_pio_read(uint16_t start_sect, uint16_t sect_count, uint8_t features, 
 	outb(ATA_HEAD, drive_head);
 	outb(ATA_CYL_LOW, (uint8_t)cylinder);
 	outb(ATA_CYL_HIGH, (uint8_t)(cylinder >> 8));
-	outb(ATA_STATUS, ATA_COMMAND_WRITE_SECT_NO_RETRY);
+	outb(ATA_STATUS, ATA_COMMAND_READ_SECT_NO_RETRY);
 	io_wait();
 
 	if (!ata_wait(100000, ATA_DRIVE_READY)) {

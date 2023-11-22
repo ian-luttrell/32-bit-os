@@ -24,7 +24,7 @@
 
 #define ATA_COMMAND_IDENTIFY 			0xEC
 #define ATA_COMMAND_RESET    			0x04
-#define ATA_COMMAND_WRITE_SECT_NO_RETRY 0x20
+#define ATA_COMMAND_READ_SECT_NO_RETRY 0x20
 
 #define BYTES_PER_SECTOR                512   // should actually get this from IDENTIFY command
 
